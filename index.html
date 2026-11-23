@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel GCD · AOM</title>
+<style>
+:root{
+  --bg:#0b1220; --panel:#131c2e; --card:#1a2540; --line:#26335a; --txt:#eef2fb; --mut:#93a0c0;
+  --red:#ff4d4f; --amb:#ffb020; --grn:#2ecc71; --blu:#4da3ff; --pur:#a78bfa;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden}
+body{display:grid;grid-template-rows:auto auto 1fr auto;gap:1.2vh;padding:1.6vh 1.2vw}
+header{display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:3.2vh;font-weight:700;letter-spacing:.02em}
+header h1 small{color:var(--mut);font-weight:500;font-size:2vh;margin-left:.8vw}
+.clock{text-align:right}
+.clock b{display:block;font-size:4vh;font-variant-numeric:tabular-nums}
+.clock span{color:var(--mut);font-size:1.7vh}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1vw}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:1.2vh;padding:1.2vh 1.2vw;border-left:.7vh solid var(--blu)}
+.kpi .n{font-size:7vh;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--mut);font-size:1.9vh;margin-top:.6vh}
+.kpi.red{border-left-color:var(--red)} .kpi.red .n{color:var(--red)}
+.kpi.amb{border-left-color:var(--amb)} .kpi.amb .n{color:var(--amb)}
+.kpi.grn{border-left-color:var(--grn)} .kpi.grn .n{color:var(--grn)}
+.kpi.pur{border-left-color:var(--pur)}
+.board{display:grid;grid-template-columns:repeat(5,1fr);gap:1vw;min-height:0}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:1.2vh;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.col h2{font-size:2.1vh;padding:1.1vh 1vw;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.col h2 .c{background:var(--line);border-radius:2vh;padding:.1vh 1vh;font-size:1.9vh}
+.cards{display:flex;flex-direction:column;gap:.9vh;padding:1vh;min-height:0;overflow:hidden}
+.card{background:var(--card);border-radius:1vh;padding:1vh 1vw;border-left:.6vh solid var(--blu)}
+.card.late{border-left-color:var(--red);background:#3a1d2c}
+.card.soon{border-left-color:var(--amb)}
+.card .t{font-size:2.1vh;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .s{font-size:1.7vh;color:var(--mut);margin-top:.3vh;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .d{font-size:1.7vh;margin-top:.4vh;font-weight:600;color:var(--grn)}
+.card.late .d{color:var(--red)} .card.soon .d{color:var(--amb)}
+.more{color:var(--mut);text-align:center;font-size:1.8vh;padding:.4vh}
+.empty{color:var(--mut);text-align:center;margin:auto;font-size:1.9vh;padding:2vh}
+footer{display:flex;justify-content:space-between;color:var(--mut);font-size:1.6vh}
+#err{color:var(--amb)}
+/* setup */
+#setup{position:fixed;inset:0;background:rgba(5,9,18,.94);display:none;align-items:center;justify-content:center;z-index:9}
+#setup .box{background:var(--panel);border:1px solid var(--line);border-radius:1.6vh;padding:3vh 2.5vw;width:min(640px,92vw)}
+#setup h2{margin-bottom:1vh} #setup p{color:var(--mut);font-size:1.9vh;margin-bottom:1.6vh;line-height:1.4}
+#setup label{display:block;margin:1.2vh 0 .4vh;font-size:1.8vh}
+#setup input{width:100%;padding:1.2vh 1vw;border-radius:.8vh;border:1px solid var(--line);background:#0b1220;color:var(--txt);font-size:2vh}
+#setup button{margin-top:2vh;margin-right:1vw;padding:1.2vh 2vw;border:0;border-radius:.8vh;background:var(--blu);color:#06101f;font-weight:700;font-size:2vh;cursor:pointer}
+#setup button.sec{background:var(--line);color:var(--txt)}
+</style>
+</head>
+<body>
+<header>
+  <h1>GCD · Chamados AOM <small>Ministério de Desbravadores e Aventureiros</small></h1>
+  <div class="clock"><b id="hora">--:--</b><span id="data"></span></div>
+</header>
+<section class="kpis" id="kpis"></section>
+<section class="board" id="board"></section>
+<footer><span id="upd">Carregando…</span><span id="err"></span><span>F = tela cheia · C = configurar</span></footer>
+
+<div id="setup"><div class="box">
+  <h2>Conectar ao Trello</h2>
+  <p>Os dados ficam só neste navegador (não vão no arquivo). Use a API key e o token gerados para o app do GCD e o ID do quadro (o código da URL do quadro).</p>
+  <label>API key</label><input id="f_key" autocomplete="off">
+  <label>Token</label><input id="f_tok" type="password" autocomplete="off">
+  <label>ID do quadro</label><input id="f_board" autocomplete="off" placeholder="ex.: IDxA7miH">
+  <label><input id="f_test" type="checkbox" style="width:auto"> Mostrar chamados de teste ([TESTE])</label>
+  <button id="b_save">Salvar e abrir</button><button class="sec" id="b_demo">Ver demonstração</button><button class="sec" id="b_close">Fechar</button>
+</div></div>
+
+<script>
+(function(){
+var STORE='gcdPainelCfg', REFRESH_MS=60000, MAX_CARDS=7;
+var OPEN=['Novo','Em análise','Em atendimento','Aguardando diretor','Encaminhado ao departamento'];
+var DONE=['Resolvido','Fechado'];
+var demo=false, cfg=load();
+
+function load(){try{return JSON.parse(localStorage.getItem(STORE)||'null')}catch(e){return null}}
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+function parseDesc(d){
+  var o={}; (d||'').split('\n').forEach(function(l){
+    var m=l.match(/^\*\*(.+?):\*\*\s*(.*)$/); if(m) o[m[1].trim().toLowerCase()]=m[2].trim();
+  }); return o;
+}
+function dueInfo(c){
+  if(!c.due) return {cls:'',txt:'sem prazo'};
+  var ms=new Date(c.due)-Date.now(), h=ms/36e5;
+  if(c.dueComplete) return {cls:'',txt:'concluído'};
+  if(ms<0){var a=-h; return {cls:'late',txt:'ATRASADO há '+(a<48?Math.round(a)+' h':Math.round(a/24)+' d')}}
+  if(h<24) return {cls:'soon',txt:'vence em '+Math.max(1,Math.round(h))+' h'};
+  return {cls:(h<72?'soon':''),txt:'prazo em '+Math.round(h/24)+' d'};
+}
+function render(lists){
+  var hideTest=!(cfg&&cfg.test);
+  var map={}, late=0, soon=0, novos=0, openN=0, doneN=0;
+  lists.forEach(function(l){
+    var cards=l.cards.filter(function(c){return !(hideTest&&/\[teste\]/i.test(c.name))});
+    map[l.name]=cards;
+  });
+  OPEN.forEach(function(n){(map[n]||[]).forEach(function(c){
+    openN++; var di=dueInfo(c); c._di=di;
+    if(di.cls==='late')late++; else if(di.cls==='soon')soon++;
+  })});
+  novos=(map['Novo']||[]).length;
+  DONE.forEach(function(n){doneN+=(map[n]||[]).length});
+
+  $('kpis').innerHTML=
+   kpi('',openN,'chamados abertos')+kpi('pur',novos,'novos, sem análise')+
+   kpi(late?'red':'grn',late,'fora do prazo')+kpi('amb',soon,'vencem em até 72 h')+kpi('grn',doneN,'resolvidos / fechados');
+
+  $('board').innerHTML=OPEN.map(function(n){
+    var cards=(map[n]||[]).slice().sort(function(a,b){return new Date(a.due||'2999')-new Date(b.due||'2999')});
+    var html=cards.slice(0,MAX_CARDS).map(function(c){
+      var p=parseDesc(c.desc), di=c._di||dueInfo(c);
+      var club=p['clube']||c.name, num=(c.name.match(/^#\d+/)||[''])[0];
+      var sub=[p['categoria'],p['regional']&&('Reg. '+p['regional'])].filter(Boolean).join(' · ');
+      return '<div class="card '+di.cls+'"><div class="t">'+esc(num+' '+club)+'</div><div class="s">'+esc(sub)+'</div><div class="d">'+esc(di.txt)+'</div></div>';
+    }).join('');
+    if(cards.length>MAX_CARDS) html+='<div class="more">+ '+(cards.length-MAX_CARDS)+' chamados</div>';
+    if(!cards.length) html='<div class="empty">Nenhum chamado</div>';
+    return '<div class="col"><h2>'+esc(n)+'<span class="c">'+cards.length+'</span></h2><div class="cards">'+html+'</div></div>';
+  }).join('');
+  $('upd').textContent='Atualizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+(demo?' · MODO DEMONSTRAÇÃO':'');
+  $('err').textContent='';
+}
+function kpi(c,n,l){return '<div class="kpi '+c+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'}
+
+function fetchTrello(){
+  if(!cfg||!cfg.key||!cfg.tok||!cfg.board){openSetup();return}
+  var url='https://api.trello.com/1/boards/'+encodeURIComponent(cfg.board)+'/lists?cards=open&card_fields=name,desc,due,dueComplete&fields=name&key='+encodeURIComponent(cfg.key)+'&token='+encodeURIComponent(cfg.tok);
+  fetch(url).then(function(r){if(!r.ok)throw new Error('Trello respondeu '+r.status);return r.json()})
+    .then(render).catch(function(e){$('err').textContent='Falha ao atualizar: '+e.message+' (mostrando último estado)'});
+}
+function demoData(){
+  var h=36e5, now=Date.now();
+  function c(n,club,cat,reg,due){return {name:'#'+n+' · '+cat,desc:'**Clube:** '+club+'\n**Regional:** '+reg+'\n**Categoria:** '+cat,due:new Date(now+due*h).toISOString(),dueComplete:false}}
+  return [
+   {name:'Novo',cards:[c(11,'Atalaia (Várzea Grande)','SGC / cadastro','Arlete Alves Lima',30),c(12,'Guardiões Da Fronteira (Várzea Grande)','Uniformes','Arlete Alves Lima',70),c(13,'Falcões (Sinop)','Eventos e inscrições','Sueli',-10)]},
+   {name:'Em análise',cards:[c(8,'Constelação (Várzea Grande)','Investidura / cerimônias','Arlete Alves Lima',18)]},
+   {name:'Em atendimento',cards:[c(5,'Águia Dourada (Pontes e Lacerda)','Materiais e formulários','Flaviane',50),c(6,'Prisma (Guarantã do Norte)','Livros e classes','Rosa',-60)]},
+   {name:'Aguardando diretor',cards:[c(3,'Jaspe (Várzea Grande)','Finanças / tesouraria','Arlete Alves Lima',90)]},
+   {name:'Encaminhado ao departamento',cards:[c(4,'Atalaia (Várzea Grande)','SGC / cadastro','Arlete Alves Lima',40)]},
+   {name:'Resolvido',cards:[{name:'#1',desc:'',due:null},{name:'#2',desc:'',due:null}]},
+   {name:'Fechado',cards:[{name:'#0',desc:'',due:null}]}
+  ];
+}
+function tick(){
+  var d=new Date();
+  $('hora').textContent=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  $('data').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+}
+function openSetup(){
+  $('f_key').value=cfg&&cfg.key||''; $('f_tok').value=cfg&&cfg.tok||''; $('f_board').value=cfg&&cfg.board||''; $('f_test').checked=!!(cfg&&cfg.test);
+  $('setup').style.display='flex';
+}
+function run(){ if(demo){render(demoData())} else fetchTrello() }
+
+$('b_save').onclick=function(){
+  cfg={key:$('f_key').value.trim(),tok:$('f_tok').value.trim(),board:$('f_board').value.trim(),test:$('f_test').checked};
+  try{localStorage.setItem(STORE,JSON.stringify(cfg))}catch(e){}
+  demo=false; $('setup').style.display='none'; run();
+};
+$('b_demo').onclick=function(){demo=true;$('setup').style.display='none';run()};
+$('b_close').onclick=function(){$('setup').style.display='none'};
+document.addEventListener('keydown',function(e){
+  if(document.activeElement&&/INPUT/.test(document.activeElement.tagName))return;
+  if(e.key==='f'||e.key==='F'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}
+  if(e.key==='c'||e.key==='C')openSetup();
+});
+if(location.search.indexOf('demo')>-1)demo=true;
+tick();setInterval(tick,15000);
+run();setInterval(run,REFRESH_MS);
+})();
+</script>
+</body>
+</html>
